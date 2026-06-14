@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SyncUp Enrichment</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <div class="header">
+    <h1>SyncUp</h1>
+    <button class="settings-btn" id="open-settings" title="Settings">⚙️</button>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="profile">Current Profile</div>
+    <div class="tab" data-tab="search">List Search</div>
+  </div>
+
+  <!-- Profile Tab -->
+  <div class="tab-content active" id="profile-tab">
+    <div id="profile-status" class="mb-2 text-center text-muted">
+      <p>Navigate to a LinkedIn profile to save it.</p>
+    </div>
+    
+    <div id="profile-preview" class="candidate-card hidden mb-2">
+      <div class="candidate-info">
+        <img alt="Profile" class="candidate-photo" id="preview-photo">
+        <div class="candidate-details">
+          <div class="candidate-name" id="preview-name">Name</div>
+          <div class="candidate-headline" id="preview-headline">Headline</div>
+          <div class="candidate-meta" id="preview-meta">Location • Company</div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn" id="save-current-profile">Save to SyncUp</button>
+    <div id="save-message" class="text-center mt-1"></div>
+  </div>
+
+  <!-- Search Tab -->
+  <div class="tab-content" id="search-tab">
+    <div id="search-form-view">
+      <div class="form-group">
+        <label for="search-role">Role / Designation *</label>
+        <input type="text" id="search-role" placeholder="e.g. Frontend Developer">
+      </div>
+      
+      <div style="display: flex; gap: 10px;">
+        <div class="form-group" style="flex: 1;">
+          <label for="search-location">Location</label>
+          <input type="text" id="search-location" placeholder="e.g. Bangalore">
+        </div>
+        <div class="form-group" style="flex: 1;">
+          <label for="search-industry">Industry</label>
+          <input type="text" id="search-industry" placeholder="e.g. Technology">
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 10px;">
+        <div class="form-group" style="flex: 1;">
+          <label for="search-company">Current Company</label>
+          <input type="text" id="search-company" placeholder="e.g. Google">
+        </div>
+        <div class="form-group" style="flex: 1;">
+          <label for="search-opentowork">Open to Work</label>
+          <select id="search-opentowork">
+            <option value="">Any</option>
+            <option value="true">Yes</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="btn" id="run-search">Search on LinkedIn</button>
+      <button class="btn secondary mt-1" id="extract-results">Extract Results from Page</button>
+    </div>
+
+    <div id="search-results-view" class="hidden mt-2">
+      <div class="results-header">
+        <h2 id="results-count">0 candidates found</h2>
+        <button class="btn secondary" id="back-to-search" style="width: auto; padding: 4px 12px; font-size: 12px;">Back</button>
+      </div>
+      <div class="candidate-list" id="candidate-list">
+        <!-- Candidate cards will be injected here -->
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

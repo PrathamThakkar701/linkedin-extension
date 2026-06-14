@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SyncUp Extension Settings</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body { padding: 20px; }
+    h1 { margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Settings</h1>
+  <div class="form-group">
+    <label for="apiUrl">API URL</label>
+    <input type="text" id="apiUrl" placeholder="http://localhost:3000">
+  </div>
+  <div class="form-group">
+    <label for="apiKey">API Key</label>
+    <input type="text" id="apiKey" placeholder="Enter API Key">
+  </div>
+  <button class="btn" id="saveBtn">Save Settings</button>
+  <div id="status" class="success-msg mt-1"></div>
+
+  <script src="options.js"></script>
+</body>
+</html>
