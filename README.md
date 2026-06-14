@@ -71,15 +71,52 @@ Click the ⚙️ icon in the popup and set:
 
 ---
 
+## Input Processing — Three Conditions
+
+The enrichment pipeline handles three types of input:
+
+| Condition | Input | Flow |
+|---|---|---|
+| **(i) Direct URL** | LinkedIn profile URL | `POST /api/enrich-url` → Proxycurl → normalize → save |
+| **(ii) Unstructured** | Name + Company | `POST /api/find` → SerpAPI → LinkedIn URL → `POST /api/enrich-url` |
+| **(iii) Chrome Extension** | DOM-scraped data | `POST /api/enrich` → normalize → save |
+
+---
+
 ## API Endpoints
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| `GET` | `/health` | None | Health check |
-| `POST` | `/api/enrich` | `x-api-key` | Save/update a candidate |
+| `GET` | `/health` | None | Health check + shows which API keys are configured |
+| `POST` | `/api/find` | `x-api-key` | **(Condition ii)** Name + Company → SerpAPI → returns LinkedIn URL |
+| `POST` | `/api/enrich-url` | `x-api-key` | **(Condition i)** LinkedIn URL → Proxycurl → normalize → save |
+| `POST` | `/api/enrich` | `x-api-key` | **(Condition iii)** Chrome extension data → normalize → save |
 | `GET` | `/api/candidates` | `x-api-key` | List all saved candidates |
 
-**POST /api/enrich — Request Body:**
+### POST /api/find
+```json
+{ "name": "Jane Doe", "company": "Acme Corp" }
+```
+Runs the query `site:linkedin.com/in/ "Jane Doe" "Acme Corp"` via SerpAPI and returns the top matching LinkedIn URL.
+
+**Response:**
+```json
+{
+  "success": true,
+  "linkedinUrl": "https://www.linkedin.com/in/janedoe",
+  "title": "Jane Doe - Frontend Developer - Acme Corp | LinkedIn",
+  "snippet": "...",
+  "query": "site:linkedin.com/in/ \"Jane Doe\" \"Acme Corp\""
+}
+```
+
+### POST /api/enrich-url
+```json
+{ "linkedinUrl": "https://www.linkedin.com/in/janedoe" }
+```
+Calls Proxycurl, normalizes the response to the candidate schema, and upserts into the local DB.
+
+### POST /api/enrich *(Chrome Extension)*
 ```json
 {
   "linkedinUrl": "https://www.linkedin.com/in/username",
@@ -87,16 +124,33 @@ Click the ⚙️ icon in the popup and set:
   "headline": "Frontend Developer at Acme",
   "currentCompany": "Acme Corp",
   "location": "Bangalore, India",
-  "email": "",
-  "phone": "",
-  "photoUrl": "https://...",
-  "skills": [],
-  "experience": [],
-  "education": []
+  "email": "", "phone": "", "photoUrl": "https://...",
+  "skills": [], "experience": [], "education": []
 }
 ```
 
-Deduplication is handled automatically — saving the same `linkedinUrl` twice will update the existing record.
+All three endpoints share the same **deduplication** logic — saving the same `linkedinUrl` twice merges/updates the existing record rather than creating a duplicate.
+
+### Candidate Schema
+```json
+{
+  "id": "cand_...",
+  "fullName": "Jane Doe",
+  "jobTitle": "Frontend Developer",
+  "company": "Acme Corp",
+  "location": "Bangalore, India",
+  "email": "",
+  "phone": "",
+  "linkedinUrl": "https://www.linkedin.com/in/janedoe",
+  "photoUrl": "",
+  "skills": [],
+  "experience": [],
+  "education": [],
+  "source": "proxycurl | linkedin-extension | api",
+  "createdAt": "...",
+  "updatedAt": "..."
+}
+```
 
 ---
 
