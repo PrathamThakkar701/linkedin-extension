@@ -1,1 +1,6 @@
 *.pdf
+node_modules/
+database.json
+.env
+.env.local
+.vercel

@@ -51,16 +51,30 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     
-    let searchUrl = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(role)}`;
+    // Build a clean keyword string combining role, location, company
+    const keywordParts = [role];
     
     const location = document.getElementById('search-location').value.trim();
-    if (location) searchUrl += ` ${encodeURIComponent('in ' + location)}`;
-    
-    const industry = document.getElementById('search-industry').value.trim();
-    if (industry) searchUrl += ` ${encodeURIComponent(industry)}`;
+    if (location) keywordParts.push(location);
     
     const company = document.getElementById('search-company').value.trim();
-    if (company) searchUrl += ` ${encodeURIComponent('at ' + company)}`;
+    if (company) keywordParts.push(company);
+
+    const industry = document.getElementById('search-industry').value.trim();
+    if (industry) keywordParts.push(industry);
+
+    const params = new URLSearchParams({
+      keywords: keywordParts.join(' '),
+      origin: 'GLOBAL_SEARCH_HEADER'
+    });
+
+    // "Open to Work" filter uses LinkedIn's built-in facet
+    const openToWork = document.getElementById('search-opentowork').value;
+    if (openToWork === 'true') {
+      params.set('openToWork', 'true');
+    }
+
+    const searchUrl = `https://www.linkedin.com/search/results/people/?${params.toString()}`;
     
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]) {
