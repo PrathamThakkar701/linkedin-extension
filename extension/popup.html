@@ -23,7 +23,7 @@
       <p>Navigate to a LinkedIn profile to save it.</p>
     </div>
     
-    <div id="profile-preview" class="candidate-card hidden mb-2">
+    <div id="profile-preview" class="candidate-card hidden mb-2" style="cursor: pointer;" title="Click to view raw scraped JSON data">
       <div class="candidate-info">
         <img alt="Profile" class="candidate-photo" id="preview-photo">
         <div class="candidate-details">
@@ -32,6 +32,10 @@
           <div class="candidate-meta" id="preview-meta">Location • Company</div>
         </div>
       </div>
+    </div>
+    
+    <div id="json-view-container" class="hidden mb-2">
+      <pre id="json-view" style="background: var(--bg-secondary); padding: 8px; border-radius: 6px; overflow-x: auto; font-size: 11px; margin: 0; border: 1px solid var(--border-color);"></pre>
     </div>
 
     <button class="btn" id="save-current-profile">Save to SyncUp</button>

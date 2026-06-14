@@ -49,13 +49,38 @@ app.post('/api/enrich', requireApiKey, (req, res) => {
 
     const db = getDatabase();
 
-    // Deduplication
-    const isDuplicate = db.candidates.some(c => c.linkedinUrl === profile.linkedinUrl);
-    if (isDuplicate) {
-        return res.status(409).json({ success: false, message: 'Candidate already exists in database', linkedinUrl: profile.linkedinUrl });
+    const existingIndex = db.candidates.findIndex(c => c.linkedinUrl === profile.linkedinUrl);
+
+    if (existingIndex !== -1) {
+        // Update existing candidate
+        const existingCandidate = db.candidates[existingIndex];
+        const updatedCandidate = {
+            ...existingCandidate,
+            fullName: profile.name || existingCandidate.fullName,
+            jobTitle: profile.headline || existingCandidate.jobTitle,
+            company: profile.currentCompany || existingCandidate.company,
+            location: profile.location || existingCandidate.location,
+            email: profile.email || existingCandidate.email,
+            phone: profile.phone || existingCandidate.phone,
+            photoUrl: profile.photoUrl || existingCandidate.photoUrl,
+            skills: profile.skills && profile.skills.length > 0 ? profile.skills : existingCandidate.skills,
+            experience: profile.experience && profile.experience.length > 0 ? profile.experience : existingCandidate.experience,
+            education: profile.education && profile.education.length > 0 ? profile.education : existingCandidate.education,
+            updatedAt: new Date().toISOString()
+        };
+        
+        db.candidates[existingIndex] = updatedCandidate;
+        saveDatabase(db);
+
+        return res.status(200).json({
+            success: true,
+            message: 'Candidate updated in local database',
+            candidateId: updatedCandidate.id,
+            candidate: updatedCandidate
+        });
     }
 
-    // Prepare Candidate Object (mapping roughly to what SyncUp might need)
+    // Prepare Candidate Object for new insert
     const newCandidate = {
         id: `cand_${Date.now()}_${Math.random().toString(36).substring(7)}`,
         fullName: profile.name || '',
@@ -70,7 +95,8 @@ app.post('/api/enrich', requireApiKey, (req, res) => {
         experience: profile.experience || [],
         education: profile.education || [],
         source: 'linkedin-extension',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
     };
 
     db.candidates.push(newCandidate);

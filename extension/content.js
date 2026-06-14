@@ -108,6 +108,52 @@ function extractFromDOM() {
   const photoEl = document.querySelector('img[src*="profile-displayphoto"]');
   if (photoEl) result.photoUrl = photoEl.src;
 
+  // 7. Experience Extraction
+  const experienceArray = [];
+  const h2s = document.querySelectorAll('h2');
+  let expHeader = null;
+  for (const h2 of h2s) {
+      if (h2.innerText && h2.innerText.trim().toLowerCase() === 'experience') {
+          expHeader = h2;
+          break;
+      }
+  }
+
+  if (expHeader) {
+      // Find the sibling container that holds the list of experience items
+      let listContainer = null;
+      let curr = expHeader.parentElement;
+      while (curr && curr.tagName !== 'BODY') {
+          // Check if the next sibling contains the entity-collection items
+          if (curr.nextElementSibling && curr.nextElementSibling.querySelector('[componentkey^="entity-collection-item-"]')) {
+             listContainer = curr.nextElementSibling;
+             break;
+          }
+          // If the current element itself contains them (fallback)
+          if (curr.querySelector('[componentkey^="entity-collection-item-"]')) {
+             listContainer = curr;
+             break;
+          }
+          curr = curr.parentElement;
+      }
+
+      if (listContainer) {
+          const items = listContainer.querySelectorAll('[componentkey^="entity-collection-item-"]');
+          items.forEach(item => {
+              const expLines = item.innerText.split('\n').map(l => l.trim()).filter(l => l.length > 0 && l !== '·' && !l.includes('...'));
+              if (expLines.length >= 2) {
+                 experienceArray.push({
+                     title: expLines[0],
+                     company: expLines[1],
+                     duration: expLines[2] || '',
+                     details: expLines.slice(3, 6).join(' | ') 
+                 });
+              }
+          });
+      }
+  }
+  result.experience = experienceArray;
+
   // Final Fallbacks
   if (!result.headline) result.headline = titleParts[1] || 'No headline';
   if (!result.location) result.location = 'Unknown Location';
@@ -141,25 +187,72 @@ function waitForProfileCard() {
 
 const extractSearchResultsData = () => {
   const results = [];
-  const cards = document.querySelectorAll('li.reusable-search__result-container, .search-result__occluded-item');
+  // LinkedIn recently changed their search results from <li> to <div role="listitem">
+  const cards = document.querySelectorAll('li.reusable-search__result-container, [role="listitem"]');
   
   cards.forEach(card => {
     const item = {};
-    const nameEl = card.querySelector('.entity-result__title-text a span[aria-hidden="true"], span[dir="ltr"] span[aria-hidden="true"], .entity-result__title-line a span');
-    const urlEl = card.querySelector('.entity-result__title-text a, a.app-aware-link');
+    
+    // Fallback logic to get the profile URL
+    const urlEl = card.querySelector('a.app-aware-link, a[href*="linkedin.com/in/"], a[href^="https://www.linkedin.com/in/"]');
+    if (!urlEl) return; // If there's no profile link in this listitem, skip it
+    
+    // Parse the URL
+    item.linkedinUrl = urlEl.href.split('?')[0];
+    
+    // Look for an image
+    const photoEl = card.querySelector('img.presence-entity__image, img[src*="profile-displayphoto"], img[alt]');
+    item.photoUrl = photoEl && photoEl.src.includes('http') ? photoEl.src : '';
+    
+    // Name is usually the alt text of the photo or inside an anchor
+    const nameEl = card.querySelector('.entity-result__title-text a span[aria-hidden="true"], span[dir="ltr"] span[aria-hidden="true"]');
+    if (nameEl) {
+       item.name = nameEl.textContent.trim();
+    } else if (photoEl && photoEl.alt && photoEl.alt.length > 0) {
+       // Many times the image has the user's name as alt text
+       item.name = photoEl.alt.trim();
+    } else {
+       // Deeply nested anchor text fallback
+       const textAnchors = card.querySelectorAll('a[href*="/in/"]');
+       for (const a of textAnchors) {
+          if (a.innerText && a.innerText.trim().length > 0) {
+             item.name = a.innerText.trim();
+             break;
+          }
+       }
+    }
+    
+    if (!item.name) item.name = 'Unknown';
+
+    // The texts are usually in multiple <p> tags if obfuscated, or standard entity-result classes.
     const headlineEl = card.querySelector('.entity-result__primary-subtitle');
     const locationEl = card.querySelector('.entity-result__secondary-subtitle');
-    const photoEl = card.querySelector('img.presence-entity__image, img[src*="profile-displayphoto"], .entity-result__image img');
+    
+    if (headlineEl) {
+      item.headline = headlineEl.textContent.trim();
+      item.location = locationEl ? locationEl.textContent.trim() : '';
+    } else {
+      // Obfuscated fallback: Get all <p> tags. 
+      // The first <p> is usually the name/connection degree.
+      // The second <p> is the headline.
+      // The third <p> is the location.
+      const pTags = Array.from(card.querySelectorAll('p')).filter(p => p.innerText && p.innerText.trim().length > 0);
+      if (pTags.length >= 2) {
+         item.headline = pTags[1].innerText.trim();
+      }
+      if (pTags.length >= 3) {
+         item.location = pTags[2].innerText.trim();
+      }
+    }
 
-    item.name = nameEl ? nameEl.textContent.trim() : '';
-    item.linkedinUrl = urlEl ? urlEl.href.split('?')[0] : '';
-    item.headline = headlineEl ? headlineEl.textContent.trim() : '';
-    item.location = locationEl ? locationEl.textContent.trim() : '';
-    item.photoUrl = photoEl ? photoEl.src : '';
     item.currentCompany = '';
 
-    if (item.name && item.linkedinUrl.includes('/in/')) {
-      results.push(item);
+    // Only add if we got a valid profile URL
+    if (item.linkedinUrl && item.linkedinUrl.includes('/in/')) {
+      // Deduplicate in case multiple list items render the same person
+      if (!results.some(r => r.linkedinUrl === item.linkedinUrl)) {
+          results.push(item);
+      }
     }
   });
 
@@ -187,7 +280,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         photoUrl:        fromJSON?.photoUrl        || fromDOM?.photoUrl        || '',
         linkedinUrl:     url,
         email: '',
-        phone: ''
+        phone: '',
+        experience:      fromDOM?.experience || []
       };
 
       sendResponse({ success: true, data: result });

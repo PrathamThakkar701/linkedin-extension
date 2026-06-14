@@ -105,6 +105,12 @@ function renderProfilePreview(data) {
   document.getElementById('preview-headline').innerText = data.headline || 'No headline';
   document.getElementById('preview-meta').innerText = `${data.location} • ${data.currentCompany}`;
   document.getElementById('save-current-profile').disabled = false;
+
+  // JSON Debugger View
+  document.getElementById('json-view').innerText = JSON.stringify(data, null, 2);
+  preview.onclick = () => {
+    document.getElementById('json-view-container').classList.toggle('hidden');
+  };
 }
 
 function renderSearchResults(results) {
@@ -150,13 +156,7 @@ async function saveToApi(data, msgElement, btnElement = null) {
   
   chrome.storage.sync.get(['apiUrl', 'apiKey'], async (settings) => {
     const apiUrl = settings.apiUrl || 'http://localhost:3000';
-    const apiKey = settings.apiKey || '';
-    
-    if (!apiKey) {
-      msgElement.innerHTML = '<span class="error-msg">API Key missing. Check Settings.</span>';
-      if (btnElement) { btnElement.disabled = false; btnElement.innerText = 'Save'; }
-      return;
-    }
+    const apiKey = settings.apiKey || 'syncup-dev-key';
     
     try {
       const res = await fetch(`${apiUrl}/api/enrich`, {
