@@ -4,3 +4,4 @@ database.json
 .env
 .env.local
 .vercel
+*.pptx
