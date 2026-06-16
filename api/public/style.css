@@ -212,6 +212,44 @@ body {
     color: #b91c1c;
 }
 
+/* Sourcing Panel */
+.sourcing-panel {
+    background: var(--bg-main);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.sourcing-panel h3 {
+    margin-bottom: 0.25rem;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sourcing-form {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.sourcing-form input {
+    flex: 1;
+    padding: 0.6rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    transition: border-color 0.2s;
+}
+
+.sourcing-form input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
 /* Table List */
 .table-container {
     border: 1px solid var(--border-color);

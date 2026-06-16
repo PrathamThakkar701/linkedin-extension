@@ -76,7 +76,14 @@
       </div>
 
       <button class="btn" id="run-search">Search on LinkedIn</button>
-      <button class="btn secondary mt-1" id="extract-results">Extract Results from Page</button>
+      
+      <div style="display: flex; gap: 10px; margin-top: 10px;">
+        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+          <label for="auto-extract-pages">Pages to Extract</label>
+          <input type="number" id="auto-extract-pages" placeholder="All" min="1">
+        </div>
+        <button class="btn secondary" id="auto-extract-btn" style="flex: 2; margin-top: 22px;">Auto-Extract Pages</button>
+      </div>
     </div>
 
     <div id="search-results-view" class="hidden mt-2">
@@ -84,6 +91,10 @@
         <h2 id="results-count">0 candidates found</h2>
         <button class="btn secondary" id="back-to-search" style="width: auto; padding: 4px 12px; font-size: 12px;">Back</button>
       </div>
+      
+      <div id="auto-extract-status" class="text-center text-muted mb-2" style="font-size: 12px; display: none;"></div>
+      <button class="btn mb-2" id="bulk-save-btn" style="display: none;">Save All to SyncUp</button>
+      <div id="bulk-save-message" class="text-center text-muted mb-2" style="font-size: 12px;"></div>
       <div class="candidate-list" id="candidate-list">
         <!-- Candidate cards will be injected here -->
       </div>

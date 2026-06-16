@@ -83,22 +83,77 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Extract Results from Search Page
-  document.getElementById('extract-results').addEventListener('click', () => {
+  // Auto Extract Pages
+  document.getElementById('auto-extract-btn').addEventListener('click', () => {
+    const pagesInput = document.getElementById('auto-extract-pages').value;
+    const maxPages = pagesInput ? parseInt(pagesInput) : 'all';
+    
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const currentTab = tabs[0];
       if (currentTab && currentTab.url.includes('linkedin.com/search/results/people')) {
-        chrome.tabs.sendMessage(currentTab.id, { action: 'EXTRACT_SEARCH' }, (response) => {
+        document.getElementById('search-form-view').classList.add('hidden');
+        document.getElementById('search-results-view').classList.remove('hidden');
+        document.getElementById('auto-extract-status').style.display = 'block';
+        document.getElementById('auto-extract-status').innerText = 'Initializing extraction...';
+        document.getElementById('bulk-save-btn').style.display = 'none';
+        document.getElementById('bulk-save-message').innerText = '';
+        document.getElementById('candidate-list').innerHTML = '';
+        document.getElementById('results-count').innerText = `Extracting...`;
+
+        chrome.tabs.sendMessage(currentTab.id, { action: 'START_PAGINATION', maxPages }, (response) => {
           if (chrome.runtime.lastError) {
-            alert("Could not extract data. Please refresh the page and try again.");
-          } else if (response && response.data) {
-            renderSearchResults(response.data);
+            alert("Could not start. Please refresh the page and try again.");
           }
         });
       } else {
         alert("Please navigate to a LinkedIn People Search results page first.");
       }
     });
+  });
+
+  // Listen for progress from content script
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === 'PAGINATION_PROGRESS') {
+        document.getElementById('auto-extract-status').innerText = `Scraping page ${message.pagesScraped}... Extracted ${message.totalCandidates} candidates so far.`;
+        renderSearchResults(message.allResults, true);
+    } else if (message.action === 'PAGINATION_COMPLETE') {
+        document.getElementById('auto-extract-status').innerText = `Finished! Extracted ${message.totalCandidates} candidates across ${message.pagesScraped} pages.`;
+        document.getElementById('results-count').innerText = `${message.totalCandidates} candidates found`;
+        
+        if (message.totalCandidates > 0) {
+            document.getElementById('bulk-save-btn').style.display = 'inline-block';
+            document.getElementById('bulk-save-btn').onclick = async () => {
+                const btn = document.getElementById('bulk-save-btn');
+                const msgEl = document.getElementById('bulk-save-message');
+                btn.disabled = true;
+                btn.innerText = 'Saving...';
+                
+                chrome.storage.sync.get(['apiUrl', 'apiKey'], async (settings) => {
+                    const apiUrl = settings.apiUrl || 'http://localhost:3000';
+                    const apiKey = settings.apiKey || 'syncup-dev-key';
+                    
+                    let successCount = 0;
+                    let failCount = 0;
+                    
+                    for (const cand of message.allResults) {
+                        try {
+                            const res = await fetch(`${apiUrl}/api/enrich-url`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+                                body: JSON.stringify({ linkedinUrl: cand.linkedinUrl })
+                            });
+                            if (res.ok) successCount++;
+                            else failCount++;
+                        } catch(e) {
+                            failCount++;
+                        }
+                    }
+                    msgEl.innerHTML = `<span class="success-msg">Successfully saved ${successCount} candidates! ${failCount > 0 ? '('+failCount+' failed)' : ''}</span>`;
+                    btn.innerText = 'Saved to SyncUp';
+                });
+            };
+        }
+    }
   });
 
   document.getElementById('back-to-search').addEventListener('click', () => {
@@ -127,10 +182,12 @@ function renderProfilePreview(data) {
   };
 }
 
-function renderSearchResults(results) {
-  document.getElementById('search-form-view').classList.add('hidden');
-  const resultsView = document.getElementById('search-results-view');
-  resultsView.classList.remove('hidden');
+function renderSearchResults(results, isProgressUpdate = false) {
+  if (!isProgressUpdate) {
+      document.getElementById('search-form-view').classList.add('hidden');
+      document.getElementById('search-results-view').classList.remove('hidden');
+      document.getElementById('results-count').innerText = `${results.length} candidates found`;
+  }
   
   document.getElementById('results-count').innerText = `${results.length} candidates found`;
   const list = document.getElementById('candidate-list');

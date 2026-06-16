@@ -105,7 +105,7 @@ function extractFromDOM() {
   }
 
   // 6. Photo URL
-  const photoEl = document.querySelector('img[src*="profile-displayphoto"]');
+  const photoEl = profileSection.querySelector('img.pv-top-card-profile-picture__image, img[src*="profile-displayphoto"], img[src*="profile-framedphoto"]');
   if (photoEl) result.photoUrl = photoEl.src;
 
   // 7. Experience Extraction
@@ -154,9 +154,80 @@ function extractFromDOM() {
   }
   result.experience = experienceArray;
 
+  // 8. Skills Extraction
+  const skillsArray = [];
+  let skillsHeader = null;
+  for (const h2 of h2s) {
+      const text = (h2.textContent || h2.innerText || '').trim().toLowerCase();
+      if (text === 'skills' || text.includes('skills')) {
+          skillsHeader = h2;
+          break;
+      }
+  }
+
+  if (skillsHeader) {
+      // Find the card container wrapping the Skills section
+      let card = skillsHeader.closest('section') || skillsHeader.closest('.artdeco-card');
+      
+      // Fallback: walk up until we find a container holding the skill paragraphs
+      if (!card) {
+          let curr = skillsHeader.parentElement;
+          while (curr && curr.tagName !== 'BODY') {
+              if (curr.querySelectorAll('p').length > 2) {
+                  card = curr;
+                  break;
+              }
+              curr = curr.parentElement;
+          }
+      }
+
+      if (card) {
+          // Grab candidate text nodes
+          const candidateNodes = card.querySelectorAll('p span[aria-hidden="true"], p > span, p');
+          
+          candidateNodes.forEach(node => {
+              // If it's a p that has a span, skip it (we'll process the span itself)
+              if (node.tagName === 'P' && node.querySelector('span')) return;
+              
+              const text = (node.textContent || node.innerText || '').trim();
+              if (!text || text.length > 50 || text.toLowerCase() === 'skills') return;
+              
+              // Skip known footer/noise elements
+              if (text.toLowerCase().includes('show all') || text.toLowerCase().includes('endorsement')) return;
+
+              // Heuristic: Primary skills do NOT have SVG icons next to them. 
+              // Sub-items (like projects using the skill) have SVG icons (folders, buildings) as siblings in the tree.
+              let isSubItem = false;
+              let curr = node;
+              
+              // Walk up to 4 levels to check for SVG siblings
+              for(let i=0; i<4; i++) {
+                  if (!curr) break;
+                  
+                  let prev = curr.previousElementSibling;
+                  while(prev) {
+                      if (prev.tagName && prev.tagName.toUpperCase() === 'SVG' || prev.querySelector && prev.querySelector('svg')) {
+                          isSubItem = true;
+                          break;
+                      }
+                      prev = prev.previousElementSibling;
+                  }
+                  
+                  if (isSubItem) break;
+                  curr = curr.parentElement;
+              }
+              
+              if (!isSubItem && !skillsArray.includes(text)) {
+                  skillsArray.push(text);
+              }
+          });
+      }
+  }
+  result.skills = skillsArray;
+
+
+
   // Final Fallbacks
-  if (!result.headline) result.headline = titleParts[1] || 'No headline';
-  if (!result.location) result.location = 'Unknown Location';
   if (!result.currentCompany) result.currentCompany = 'Unknown Company';
 
   return result;
@@ -187,8 +258,23 @@ function waitForProfileCard() {
 
 const extractSearchResultsData = () => {
   const results = [];
-  // LinkedIn recently changed their search results from <li> to <div role="listitem">
-  const cards = document.querySelectorAll('li.reusable-search__result-container, [role="listitem"]');
+  
+  // Safely locate the main search results container to avoid grabbing global nav items
+  const container = document.querySelector('.search-results-container, ul.reusable-search__entity-result-list, main');
+  if (!container) return results;
+
+  // Grab the actual cards using standard classes or the fallback listitem role
+  let cards = Array.from(container.querySelectorAll('li.reusable-search__result-container, ul.reusable-search__entity-result-list > li, div.entity-result, [role="listitem"]'));
+  
+  // Obfuscated Layout Fallback: if no standard cards are found, find profile links and use their parent wrappers
+  if (cards.length === 0) {
+      const links = Array.from(container.querySelectorAll('a[href*="/in/"]'));
+      const parents = new Set();
+      links.forEach(a => {
+          if (a.parentElement) parents.add(a.parentElement);
+      });
+      cards = Array.from(parents);
+  }
   
   cards.forEach(card => {
     const item = {};
@@ -200,17 +286,36 @@ const extractSearchResultsData = () => {
     // Parse the URL
     item.linkedinUrl = urlEl.href.split('?')[0];
     
-    // Look for an image
-    const photoEl = card.querySelector('img.presence-entity__image, img[src*="profile-displayphoto"], img[alt]');
-    item.photoUrl = photoEl && photoEl.src.includes('http') ? photoEl.src : '';
+    // Strictly look for the candidate's main image wrapper
+    let photoUrl = '';
+    let imgEl = null;
+    
+    // In new layouts, the anchor tag wraps the entire profile block including the image
+    if (urlEl) {
+        imgEl = urlEl.querySelector('img');
+    }
+    
+    // Fallback to standard classes or CDN URLs
+    if (!imgEl) {
+        imgEl = card.querySelector('.entity-result__image img, .presence-entity img, img[src*="profile-displayphoto"], img[src*="profile-framedphoto"]');
+    }
+
+    if (imgEl) {
+        // LinkedIn lazy-loads images. The real URL is often in data-delayed-url
+        photoUrl = imgEl.getAttribute('data-delayed-url') || imgEl.getAttribute('data-src') || imgEl.getAttribute('src') || '';
+        if (!photoUrl.includes('http') || photoUrl.startsWith('data:')) {
+            photoUrl = '';
+        }
+    }
+    item.photoUrl = photoUrl;
     
     // Name is usually the alt text of the photo or inside an anchor
     const nameEl = card.querySelector('.entity-result__title-text a span[aria-hidden="true"], span[dir="ltr"] span[aria-hidden="true"]');
     if (nameEl) {
        item.name = nameEl.textContent.trim();
-    } else if (photoEl && photoEl.alt && photoEl.alt.length > 0) {
+    } else if (imgEl && imgEl.alt && imgEl.alt.length > 0) {
        // Many times the image has the user's name as alt text
-       item.name = photoEl.alt.trim();
+       item.name = imgEl.alt.trim();
     } else {
        // Deeply nested anchor text fallback
        const textAnchors = card.querySelectorAll('a[href*="/in/"]');
@@ -223,6 +328,16 @@ const extractSearchResultsData = () => {
     }
     
     if (!item.name) item.name = 'Unknown';
+    
+    // Sanitize the name to remove the rest of the card text if the anchor wrapped everything
+    if (item.name.includes('\n')) {
+        item.name = item.name.split('\n')[0];
+    }
+    // Remove connection degree (e.g. 'Priya M. • 2nd' -> 'Priya M.')
+    if (item.name.includes('•')) {
+        item.name = item.name.split('•')[0];
+    }
+    item.name = item.name.trim();
 
     // The texts are usually in multiple <p> tags if obfuscated, or standard entity-result classes.
     const headlineEl = card.querySelector('.entity-result__primary-subtitle');
@@ -259,6 +374,84 @@ const extractSearchResultsData = () => {
   return results;
 };
 
+async function autoPaginateSearch(maxPages) {
+  let pagesScraped = 0;
+  let allResults = [];
+  
+  while (maxPages === 'all' || pagesScraped < maxPages) {
+      // 1. Extract current page
+      const results = extractSearchResultsData();
+      
+      // Deduplicate before adding
+      results.forEach(cand => {
+          if (!allResults.some(r => r.linkedinUrl === cand.linkedinUrl)) {
+              allResults.push(cand);
+          }
+      });
+      
+      pagesScraped++;
+      
+      // Send progress to popup
+      try {
+          chrome.runtime.sendMessage({
+              action: 'PAGINATION_PROGRESS',
+              pagesScraped,
+              totalCandidates: allResults.length,
+              allResults
+          });
+      } catch(e) {}
+      
+      // 2. Check limits
+      if (maxPages !== 'all' && pagesScraped >= maxPages) break;
+      
+      // 3. Scroll to the bottom to ensure pagination button is visible
+      const scrollableDiv = document.querySelector('.scaffold-layout__main, #main, .authentication-outlet, main');
+      if (scrollableDiv) {
+          scrollableDiv.scrollTo(0, scrollableDiv.scrollHeight);
+      }
+      window.scrollTo(0, document.body.scrollHeight);
+      await new Promise(r => setTimeout(r, 1500));
+      
+      // 4. Find Next button
+      let nextBtn = document.querySelector('button.artdeco-pagination__button--next');
+      if (!nextBtn) nextBtn = document.querySelector('button[aria-label="Next"]');
+      if (!nextBtn) nextBtn = document.querySelector('button[aria-label="Next page"]');
+      if (!nextBtn) {
+          nextBtn = Array.from(document.querySelectorAll('button')).find(b => {
+              const text = (b.innerText || '').trim();
+              return text === 'Next' || text === 'Next page';
+          });
+      }
+      
+      if (!nextBtn || nextBtn.disabled) break; // End of results
+      
+      // 5. Click Next
+      nextBtn.click();
+      
+      // 6. Wait for new results to load
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Wait for at least one card to appear to ensure loading finished
+      let retries = 0;
+      while(!document.querySelector('li.reusable-search__result-container, [role="listitem"], main a[href*="/in/"]') && retries < 10) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          retries++;
+      }
+      
+      // Extra buffer to let images/texts settle
+      await new Promise(resolve => setTimeout(resolve, 1500));
+  }
+  
+  try {
+      chrome.runtime.sendMessage({
+          action: 'PAGINATION_COMPLETE',
+          pagesScraped,
+          totalCandidates: allResults.length,
+          allResults
+      });
+  } catch(e) {}
+}
+
 // --- MESSAGE LISTENER ---
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -281,7 +474,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         linkedinUrl:     url,
         email: '',
         phone: '',
-        experience:      fromDOM?.experience || []
+        experience:      fromDOM?.experience || [],
+        skills:          fromDOM?.skills || []
       };
 
       sendResponse({ success: true, data: result });
@@ -290,6 +484,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // required for async sendResponse
   } else if (message.action === 'EXTRACT_SEARCH') {
     sendResponse({ success: true, data: extractSearchResultsData() });
+    return true;
+  } else if (message.action === 'START_PAGINATION') {
+    autoPaginateSearch(message.maxPages);
+    sendResponse({ success: true });
     return true;
   }
 });
