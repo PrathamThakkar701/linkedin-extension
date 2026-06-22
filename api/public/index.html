@@ -36,15 +36,17 @@
                 <p class="subtitle" id="candidate-count-display">Loading...</p>
             </div>
             <div class="header-actions">
-                <div class="search-bar">
-                    <i class="fa-solid fa-search icon-muted"></i>
-                    <input type="text" id="search-input" placeholder="Search...">
-                </div>
                 <button class="btn btn-outline" id="refresh-btn">
                     <i class="fa-solid fa-rotate-right"></i> Refresh
                 </button>
             </div>
         </header>
+
+        <!-- Tab Navigation -->
+        <div class="tabs-container">
+            <button class="tab-btn active" data-target="tab-dashboard">Dashboard</button>
+            <button class="tab-btn" data-target="tab-sourcing">Manual Sourcing</button>
+        </div>
 
         <!-- Error State -->
         <div id="error-container" class="hidden error-panel">
@@ -55,45 +57,63 @@
             </div>
         </div>
 
-        <!-- Manual Sourcing Panel -->
-        <div class="sourcing-panel">
-            <h3><i class="fa-solid fa-magnifying-glass"></i> Manual Sourcing</h3>
-            <p class="text-muted text-small" style="margin-bottom: 12px;">Find a candidate's LinkedIn URL by name and company</p>
-            <div class="sourcing-form">
-                <input type="text" id="source-name" placeholder="Candidate Name (e.g. John Doe)" required>
-                <input type="text" id="source-company" placeholder="Company (e.g. Google)">
-                <button id="source-find-btn" class="btn btn-primary">Find LinkedIn</button>
-            </div>
-            <div id="source-result" class="hidden" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
-                <p style="margin-bottom: 10px;"><strong>Match Found:</strong> <a href="#" id="source-link" target="_blank" style="color: var(--primary-color);">LinkedIn Profile</a></p>
-                <div class="source-actions" style="display: flex; gap: 10px;">
-                    <button id="source-enrich-btn" class="btn btn-outline" style="color: #0d9488; border-color: #0d9488;">
-                        <i class="fa-solid fa-cloud-arrow-down"></i> Auto-Save via RapidAPI
-                    </button>
-                    <a href="#" id="source-open-btn" class="btn btn-outline" target="_blank">
-                        <i class="fa-solid fa-up-right-from-square"></i> Open Profile
-                    </a>
+        <!-- Tab Content: Dashboard -->
+        <div id="tab-dashboard" class="tab-content active">
+            <!-- Filters Bar -->
+            <div class="filters-bar">
+                <div class="search-bar">
+                    <i class="fa-solid fa-search icon-muted"></i>
+                    <input type="text" id="search-input" placeholder="Search any...">
                 </div>
+                <div class="filter-group">
+                    <input type="text" id="filter-location" placeholder="Location (e.g. Noida, Hyd)" class="input-filter">
+                </div>
+                <div class="filter-group">
+                    <input type="text" id="filter-title" placeholder="Job Title (e.g. Manager)" class="input-filter">
+                </div>
+                <div class="filter-group">
+                    <input type="text" id="filter-company" placeholder="Company (e.g. Google)" class="input-filter">
+                </div>
+            </div>
+
+            <!-- Candidates List -->
+            <div class="table-container">
+                <table class="candidates-table">
+                    <thead>
+                        <tr>
+                            <th>Candidate</th>
+                            <th>Headline</th>
+                            <th>Location</th>
+                            <th>Latest Role</th>
+                            <th>Updated</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="candidates-list">
+                        <!-- List rows injected here -->
+                    </tbody>
+                </table>
             </div>
         </div>
 
-        <!-- Candidates List -->
-        <div class="table-container">
-            <table class="candidates-table">
-                <thead>
-                    <tr>
-                        <th>Candidate</th>
-                        <th>Headline</th>
-                        <th>Location</th>
-                        <th>Latest Role</th>
-                        <th>Updated</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="candidates-list">
-                    <!-- List rows injected here -->
-                </tbody>
-            </table>
+        <!-- Tab Content: Manual Sourcing -->
+        <div id="tab-sourcing" class="tab-content hidden">
+            <!-- Manual Sourcing Panel -->
+            <div class="sourcing-panel">
+                <h3><i class="fa-solid fa-magnifying-glass"></i> Manual Sourcing</h3>
+                <p class="text-muted text-small" style="margin-bottom: 12px;">Find a candidate's LinkedIn URL by name and company</p>
+                <div class="sourcing-form">
+                    <input type="text" id="source-name" placeholder="Candidate Name (e.g. John Doe)" required>
+                    <input type="text" id="source-company" placeholder="Company (e.g. Google)">
+                    <button id="source-find-btn" class="btn btn-primary">Find LinkedIn</button>
+                </div>
+                <div id="source-results-container" class="hidden" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                    <p style="margin-bottom: 10px; font-weight: 600;" id="source-results-header">Matches Found:</p>
+                    <div id="source-results-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 300px; overflow-y: auto;">
+                        <!-- Results injected here -->
+                    </div>
+                </div>
+            </div>
         </div>
     </main>
 
@@ -112,9 +132,14 @@
                         <p><i class="fa-solid fa-envelope"></i> <span id="modal-email"></span></p>
                         <p><i class="fa-solid fa-phone"></i> <span id="modal-phone"></span></p>
                     </div>
-                    <button id="fetch-contact-btn" class="btn btn-outline" style="margin-top: 10px;">
-                        <i class="fa-solid fa-address-book"></i> Fetch Contact Info
-                    </button>
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <button id="fetch-contact-btn" class="btn btn-outline">
+                            <i class="fa-solid fa-address-book"></i> Fetch Contact Info
+                        </button>
+                        <button id="fetch-more-btn" class="btn btn-outline">
+                            <i class="fa-solid fa-cloud-arrow-down"></i> Fetch More (PDL)
+                        </button>
+                    </div>
                 </div>
             </div>
             <div class="modal-body">
@@ -129,6 +154,22 @@
             </div>
         </div>
     </div>
+
+    <!-- Custom Confirm Modal -->
+    <div id="confirm-modal" class="modal hidden" style="z-index: 10000;">
+        <div class="modal-backdrop" id="confirm-backdrop"></div>
+        <div class="modal-content" style="max-width: 400px; padding: 2rem; text-align: center;">
+            <h3 style="margin-bottom: 1rem; font-size: 1.25rem;">Confirm Action</h3>
+            <p id="confirm-message" style="margin-bottom: 1.5rem; color: var(--text-muted);">Are you sure?</p>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button id="confirm-cancel-btn" class="btn btn-outline" style="flex: 1;">Cancel</button>
+                <button id="confirm-ok-btn" class="btn" style="flex: 1; background-color: var(--danger); color: white; border: none;">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="toast-container"></div>
 
     <script src="app.js"></script>
 </body>

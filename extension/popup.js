@@ -1,4 +1,25 @@
 document.addEventListener('DOMContentLoaded', () => {
+  // Toast Notification System
+  function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.innerText = message;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+          toast.classList.add('hide');
+          setTimeout(() => toast.remove(), 300);
+      }, 3000);
+  }
+
+  // Override native alert
+  window.alert = function(message) {
+      showToast(message, 'error');
+  };
+
   // Tab Switching
   const tabs = document.querySelectorAll('.tab');
   const tabContents = document.querySelectorAll('.tab-content');
@@ -132,23 +153,72 @@ document.addEventListener('DOMContentLoaded', () => {
                     const apiUrl = settings.apiUrl || 'http://localhost:3000';
                     const apiKey = settings.apiKey || 'syncup-dev-key';
                     
-                    let successCount = 0;
-                    let failCount = 0;
+                    let limit = Infinity;
+                    try {
+                        const configRes = await fetch(`${apiUrl}/api/config`, {
+                            headers: { 'x-api-key': apiKey }
+                        });
+                        const configData = await configRes.json();
+                        if (configData.success && configData.MAX_BULK_PROFILES !== null) {
+                            limit = configData.MAX_BULK_PROFILES;
+                        }
+                    } catch (e) { console.warn("Could not fetch limit config"); }
+                    
+                    // Step 1: Save all extracted profiles instantly as "skeleton" profiles
+                    for (const cand of message.allResults) {
+                        try {
+                            await fetch(`${apiUrl}/api/enrich`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+                                body: JSON.stringify({
+                                    linkedinUrl: cand.linkedinUrl,
+                                    name: cand.name,
+                                    headline: cand.headline,
+                                    location: cand.location,
+                                    photoUrl: cand.photoUrl,
+                                    experience: [],
+                                    skills: [],
+                                    education: []
+                                })
+                            });
+                        } catch(e) {}
+                    }
+                    
+                    // Step 2: Fetch PDL data until we get 'limit' successful returns
+                    let pdlSuccessCount = 0;
+                    let pdlFailCount = 0;
                     
                     for (const cand of message.allResults) {
+                        if (pdlSuccessCount >= limit) break; // Reached the max_bulk_limit of SUCCESSFUL pdl fetches
+                        
                         try {
                             const res = await fetch(`${apiUrl}/api/enrich-url`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
-                                body: JSON.stringify({ linkedinUrl: cand.linkedinUrl })
+                                body: JSON.stringify({ 
+                                    linkedinUrl: cand.linkedinUrl,
+                                    fallbackData: {
+                                        name: cand.name,
+                                        headline: cand.headline,
+                                        thumbnail: cand.photoUrl
+                                    }
+                                })
                             });
-                            if (res.ok) successCount++;
-                            else failCount++;
+                            const enrichData = await res.json();
+                            
+                            // If it's OK, success is true, and it is NOT a skeleton fallback, it means PDL found it!
+                            if (res.ok && enrichData.success && !enrichData.fallback) {
+                                pdlSuccessCount++;
+                            } else {
+                                pdlFailCount++;
+                            }
                         } catch(e) {
-                            failCount++;
+                            console.error(`[SyncUp] PDL Fetch Exception for ${cand.linkedinUrl}:`, e);
+                            pdlFailCount++;
                         }
                     }
-                    msgEl.innerHTML = `<span class="success-msg">Successfully saved ${successCount} candidates! ${failCount > 0 ? '('+failCount+' failed)' : ''}</span>`;
+                    
+                    msgEl.innerHTML = `<span class="success-msg">Successfully saved all ${message.allResults.length} basic profiles! PDL Enriched ${pdlSuccessCount} profiles.</span>`;
                     btn.innerText = 'Saved to SyncUp';
                 });
             };
@@ -173,7 +243,30 @@ function renderProfilePreview(data) {
   document.getElementById('preview-name').innerText = data.name || 'Unknown';
   document.getElementById('preview-headline').innerText = data.headline || 'No headline';
   document.getElementById('preview-meta').innerText = `${data.location} • ${data.currentCompany}`;
-  document.getElementById('save-current-profile').disabled = false;
+  const saveBtn = document.getElementById('save-current-profile');
+  saveBtn.disabled = false;
+  saveBtn.innerText = 'Save to SyncUp';
+  saveBtn.style.backgroundColor = 'var(--primary-color)';
+
+  // Check if candidate exists in DB
+  if (data.linkedinUrl) {
+      chrome.storage.sync.get(['apiUrl', 'apiKey'], async (settings) => {
+          const apiUrl = settings.apiUrl || 'http://localhost:3000';
+          const apiKey = settings.apiKey || 'syncup-dev-key';
+          try {
+              const res = await fetch(`${apiUrl}/api/candidates/check?url=${encodeURIComponent(data.linkedinUrl)}`, {
+                  headers: { 'x-api-key': apiKey }
+              });
+              const json = await res.json();
+              if (json.success && json.exists) {
+                  saveBtn.innerText = 'Update Profile (Already Saved)';
+                  saveBtn.style.backgroundColor = 'var(--success-color)';
+              }
+          } catch(e) {
+              console.error('Check exists error:', e);
+          }
+      });
+  }
 
   // JSON Debugger View
   document.getElementById('json-view').innerText = JSON.stringify(data, null, 2);

@@ -232,6 +232,53 @@ h1, h2, h3 {
   margin-bottom: 4px;
 }
 
+/* Toast Notifications */
+.toast-container {
+    position: fixed;
+    bottom: 15px;
+    right: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 9999;
+    pointer-events: none;
+}
+
+.toast {
+    background: var(--card-bg);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    padding: 10px 16px;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    font-size: 13px;
+    font-weight: 500;
+    pointer-events: auto;
+    animation: toastSlideIn 0.3s ease forwards;
+    transition: opacity 0.3s ease;
+}
+
+.toast.error {
+    border-left: 4px solid var(--danger-color);
+}
+
+.toast.success {
+    border-left: 4px solid var(--success-color);
+}
+
+.toast.info {
+    border-left: 4px solid var(--primary-color);
+}
+
+.toast.hide {
+    opacity: 0;
+}
+
+@keyframes toastSlideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
 .candidate-meta {
   font-size: 11px;
   color: var(--text-muted);

@@ -14,6 +14,32 @@ router.get('/', async (req, res) => {
     }
 });
 
+// Shared URL cleaner
+function cleanLinkedinUrl(url) {
+    if (!url) return '';
+    let clean = url.split('?')[0].replace(/\/+$/, '').toLowerCase();
+    const match = clean.match(/linkedin\.com\/in\/([^\/]+)/);
+    if (match) {
+        return `https://www.linkedin.com/in/${match[1]}`;
+    }
+    return clean;
+}
+
+// GET /api/candidates/check
+router.get('/check', async (req, res) => {
+    const { url } = req.query;
+    if (!url) return res.status(400).json({ success: false, error: 'url query parameter is required' });
+    
+    try {
+        const cleanedUrl = cleanLinkedinUrl(url);
+        const existing = await Candidate.findOne({ linkedinUrl: cleanedUrl });
+        res.json({ success: true, exists: !!existing });
+    } catch (err) {
+        console.error('[/api/candidates/check] error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 // DELETE /api/candidates/:id
 router.delete('/:id', async (req, res) => {
     const { id } = req.params;

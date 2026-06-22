@@ -73,6 +73,8 @@ function extractFromDOM() {
   if (nameIndex !== -1) {
     let nextIndex = nameIndex + 1;
     
+    /* 
+    // OLD LOGIC (Commented out as requested):
     // Skip pronouns if they exist
     const pronouns = ['he/him', 'she/her', 'they/them'];
     if (lines[nextIndex] && pronouns.some(p => lines[nextIndex].toLowerCase().includes(p))) {
@@ -83,8 +85,31 @@ function extractFromDOM() {
     if (lines[nextIndex]) {
       result.headline = lines[nextIndex];
     }
+    */
 
-    // Location is usually right before "Contact info"
+    // NEW LOGIC: Skip pronouns AND connection degrees
+    while (lines[nextIndex]) {
+        const textLower = lines[nextIndex].toLowerCase().trim();
+        
+        // Is it a pronoun?
+        const isPronoun = ['he/him', 'she/her', 'they/them'].some(p => textLower.includes(p));
+        
+        // Is it a connection degree? (Usually "1st", "2nd", "3rd", or "• 1st")
+        const isDegree = ['1st', '2nd', '3rd'].some(d => textLower.includes(d)) && textLower.length < 15;
+        
+        // Is it an audio pronunciation icon label? (Sometimes screen readers read out a hidden label)
+        const isAudioLabel = textLower.includes('listen to');
+        
+        if (isPronoun || isDegree || isAudioLabel) {
+            nextIndex++; // Skip this line, move to the next
+        } else {
+            // We found the actual headline!
+            result.headline = lines[nextIndex];
+            break;
+        }
+    }
+
+      // Location is usually right before "Contact info"
     let contactInfoIndex = lines.findIndex(l => l.toLowerCase() === 'contact info');
     if (contactInfoIndex !== -1) {
        if (lines[contactInfoIndex - 1] === '·' && lines[contactInfoIndex - 2]) {
@@ -95,14 +120,39 @@ function extractFromDOM() {
     }
   }
 
-  // 5. Find Current Company via logo SVG heuristics
-  const companySvg = profileSection.querySelector('svg[id^="company-"]');
-  if (companySvg) {
-    const companyContainer = companySvg.closest('div').parentElement;
-    if (companyContainer && companyContainer.innerText) {
-       result.currentCompany = companyContainer.innerText.split('\n')[0].trim();
-    }
+  // 5. Find Current Company / Education (strictly from the top card to avoid 'Interests' section)
+  let currentCompany = '';
+  const topCard = document.querySelector('main > section:first-of-type') || document.querySelector('.pv-top-card');
+  
+  if (topCard) {
+      // Method A: Look for accessibility labels
+      const companyBtn = topCard.querySelector('[aria-label^="Current company:"], [aria-label^="Education:"]');
+      if (companyBtn) {
+          currentCompany = companyBtn.getAttribute('aria-label').replace('Current company:', '').replace('Education:', '').trim();
+      } 
+      // Method B: Look for direct links to a company or school page
+      if (!currentCompany) {
+          const companyLinks = topCard.querySelectorAll('a[href*="/company/"], a[href*="/school/"]');
+          for (const link of companyLinks) {
+              if (link.innerText && link.innerText.trim().length > 0) {
+                  currentCompany = link.innerText.trim();
+                  break;
+              }
+          }
+      }
+      // Method C: Generic SVG heuristic (like before, but restricted to the top card ONLY)
+      if (!currentCompany) {
+          const companySvg = topCard.querySelector('svg[id^="company-"]');
+          if (companySvg) {
+              const companyContainer = companySvg.closest('div').parentElement;
+              if (companyContainer && companyContainer.innerText) {
+                 currentCompany = companyContainer.innerText.split('\n')[0].trim();
+              }
+          }
+      }
   }
+  
+  result.currentCompany = currentCompany;
 
   // 6. Photo URL
   const photoEl = profileSection.querySelector('img.pv-top-card-profile-picture__image, img[src*="profile-displayphoto"], img[src*="profile-framedphoto"]');
@@ -228,7 +278,22 @@ function extractFromDOM() {
 
 
   // Final Fallbacks
-  if (!result.currentCompany) result.currentCompany = 'Unknown Company';
+  if (!result.currentCompany || result.currentCompany === 'Unknown Company') {
+      const exp = result.experience || [];
+      if (exp.length > 0) {
+          const presentExp = exp.find(e => e.duration && e.duration.toLowerCase().includes('present'));
+          if (presentExp) {
+              result.currentCompany = presentExp.company;
+          } else {
+              result.currentCompany = exp[0].company;
+          }
+          if (result.currentCompany && result.currentCompany.includes(' · ')) {
+              result.currentCompany = result.currentCompany.split(' · ')[0];
+          }
+      } else {
+          result.currentCompany = 'Unknown Company';
+      }
+  }
 
   return result;
 }
@@ -452,11 +517,121 @@ async function autoPaginateSearch(maxPages) {
   } catch(e) {}
 }
 
+async function extractContactInfo() {
+  return new Promise(async (resolve) => {
+      try {
+          let contactLink = document.querySelector('a#top-card-text-details-contact-info');
+          if (!contactLink) {
+              contactLink = Array.from(document.querySelectorAll('a')).find(a => a.href && a.href.includes('/contact-info'));
+          }
+          
+          if (!contactLink) {
+              console.warn("[SyncUp] No contact info link found.");
+              return resolve({ email: '', phone: '' });
+          }
+
+          // Check if this is a 1st-degree connection. If not, clicking contact info often opens a Premium upsell.
+          const topCardText = (document.querySelector('.pv-top-card') || document.body).innerText;
+          if (!topCardText.includes('1st') && !topCardText.includes('Contact info')) {
+              console.warn("[SyncUp] Not a 1st degree connection. Skipping contact info to avoid Premium upsell.");
+              return resolve({ email: '', phone: '' });
+          }
+
+          console.warn("[SyncUp] Found contact link and verified 1st-degree. Dispatching trusted-like click...");
+          
+          // React often ignores .click() on <a> tags if isTrusted is false, causing a hard page reload!
+          // We dispatch a custom MouseEvent to trick React into handling it as a soft modal open.
+          const childSpan = contactLink.querySelector('span');
+          const targetNode = childSpan ? childSpan : contactLink;
+          
+          targetNode.dispatchEvent(new MouseEvent('click', {
+              view: window,
+              bubbles: true,
+              cancelable: true,
+              buttons: 1
+          }));
+
+          console.warn("[SyncUp] Waiting for contact data to appear in DOM...");
+          
+          let retries = 0;
+          let email = '';
+          let phone = '';
+          
+          while (retries < 20) {
+              await new Promise(r => setTimeout(r, 300));
+              
+              // 1. Try finding email via mailto link
+              const emailEl = document.querySelector('a[href^="mailto:"]');
+              if (emailEl) {
+                  email = (emailEl.textContent || emailEl.innerText || '').trim();
+              }
+              
+              // 2. Try finding phone via tel link
+              const phoneEl = document.querySelector('a[href^="tel:"]');
+              if (phoneEl) {
+                  phone = (phoneEl.textContent || phoneEl.innerText || '').trim();
+              }
+              
+              // Fallback Regex on the entire body text (since modal classes are obfuscated)
+              const bodyText = document.body.innerText || '';
+              
+              if (!email) {
+                  // Find all emails on the page. The modal text is usually appended at the end of the DOM.
+                  const emailMatches = bodyText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g);
+                  if (emailMatches && emailMatches.length > 0) {
+                      email = emailMatches[emailMatches.length - 1]; // Grab the last one found
+                  }
+              }
+
+              if (!phone) {
+                  // Basic regex for phone numbers in LinkedIn's HTML structure
+                  const phoneMatch = bodyText.match(/(?:phone|Phone|Mobile)[\s\S]{0,100}?(\+?\d{1,3}[\s.-]?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})/);
+                  if (phoneMatch) phone = phoneMatch[1].trim();
+              }
+              
+              if (email || phone) break;
+              retries++;
+          }
+
+          console.warn(`[SyncUp] Extracted Contact Info -> Email: ${email}, Phone: ${phone}`);
+
+          // Human-like delay to prevent account bans
+          const delayMs = Math.floor(1500 + Math.random() * 1000); // 1.5 to 2.5 seconds
+          console.warn(`[SyncUp] Waiting ${delayMs}ms to simulate human behavior before closing...`);
+          await new Promise(r => setTimeout(r, delayMs));
+
+          // Close modal aggressively
+          console.warn("[SyncUp] Attempting to close modal...");
+          let closeRetries = 0;
+          let closed = false;
+          while (!closed && closeRetries < 5) {
+              // Standard close buttons or obfuscated SVG dismiss buttons
+              const closeBtn = document.querySelector('button[aria-label="Dismiss"], button[aria-label="Close"], button[data-test-modal-close-btn], .artdeco-modal__dismiss');
+              if (closeBtn) {
+                  closeBtn.click();
+                  closed = true;
+              } else {
+                  // Simulated Escape Key
+                  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
+              }
+              await new Promise(r => setTimeout(r, 200));
+              closeRetries++;
+          }
+
+          console.warn("[SyncUp] Finished contact extraction.");
+          resolve({ email, phone });
+      } catch (e) {
+          console.error("[SyncUp] Error extracting contact info:", e);
+          resolve({ email: '', phone: '' });
+      }
+  });
+}
+
 // --- MESSAGE LISTENER ---
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'EXTRACT_PROFILE') {
-    waitForProfileCard().then(() => {
+    waitForProfileCard().then(async () => {
       const fromJSON = extractFromEmbeddedJSON();
       const fromDOM  = extractFromDOM();
       
@@ -464,6 +639,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const url = linkedinUrlMatch ? `https://www.${linkedinUrlMatch[0]}` : window.location.href;
 
       const titleParts = document.title.split('|')[0].split('-').map(p => p.trim());
+      
+      const contactInfo = await extractContactInfo();
 
       const result = {
         name:            fromJSON?.name            || fromDOM?.name            || titleParts[0] || 'Unknown',
@@ -472,8 +649,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         currentCompany:  fromJSON?.currentCompany  || fromDOM?.currentCompany  || 'Unknown Company',
         photoUrl:        fromJSON?.photoUrl        || fromDOM?.photoUrl        || '',
         linkedinUrl:     url,
-        email: '',
-        phone: '',
+        email:           contactInfo.email || '',
+        phone:           contactInfo.phone || '',
         experience:      fromDOM?.experience || [],
         skills:          fromDOM?.skills || []
       };

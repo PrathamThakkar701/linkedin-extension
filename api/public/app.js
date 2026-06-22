@@ -1,4 +1,61 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Toast Notification System
+    function showToast(message, type = 'info') {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        
+        let icon = '<i class="fa-solid fa-circle-info"></i>';
+        if (type === 'error') icon = '<i class="fa-solid fa-circle-exclamation"></i>';
+        if (type === 'success') icon = '<i class="fa-solid fa-circle-check"></i>';
+
+        toast.innerHTML = `${icon} <span>${message}</span>`;
+        container.appendChild(toast);
+
+        setTimeout(() => {
+            toast.classList.add('hide');
+            setTimeout(() => toast.remove(), 300);
+        }, 4000);
+    }
+
+    // Override native alert to use toaster
+    window.alert = function(message) {
+        showToast(message, 'error');
+    };
+
+    // Custom Confirm Modal
+    function showConfirm(message) {
+        return new Promise((resolve) => {
+            const modal = document.getElementById('confirm-modal');
+            const msgEl = document.getElementById('confirm-message');
+            const btnOk = document.getElementById('confirm-ok-btn');
+            const btnCancel = document.getElementById('confirm-cancel-btn');
+            const backdrop = document.getElementById('confirm-backdrop');
+
+            if (!modal) return resolve(window.confirm(message)); // Fallback
+
+            msgEl.innerText = message;
+            modal.classList.remove('hidden');
+
+            const closeAndResolve = (result) => {
+                modal.classList.add('hidden');
+                btnOk.removeEventListener('click', onOk);
+                btnCancel.removeEventListener('click', onCancel);
+                backdrop.removeEventListener('click', onCancel);
+                resolve(result);
+            };
+
+            const onOk = () => closeAndResolve(true);
+            const onCancel = () => closeAndResolve(false);
+
+            btnOk.addEventListener('click', onOk);
+            btnCancel.addEventListener('click', onCancel);
+            backdrop.addEventListener('click', onCancel);
+        });
+    }
+
     const listBody = document.getElementById('candidates-list');
     const searchInput = document.getElementById('search-input');
     const refreshBtn = document.getElementById('refresh-btn');
@@ -20,6 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalExperience = document.getElementById('modal-experience');
     const modalRaw = document.getElementById('modal-raw');
     const fetchContactBtn = document.getElementById('fetch-contact-btn');
+    const fetchMoreBtn = document.getElementById('fetch-more-btn');
     const modalContactInfo = document.getElementById('modal-contact-info');
     const modalEmail = document.getElementById('modal-email');
     const modalPhone = document.getElementById('modal-phone');
@@ -32,6 +90,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const sourceLink = document.getElementById('source-link');
     const sourceEnrichBtn = document.getElementById('source-enrich-btn');
     const sourceOpenBtn = document.getElementById('source-open-btn');
+
+    // Tabs
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    // Filters
+    const filterTitle = document.getElementById('filter-title');
+    const filterCompany = document.getElementById('filter-company');
+    const filterLocation = document.getElementById('filter-location');
 
     let allCandidates = [];
 
@@ -64,16 +131,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 allCandidates = data.candidates || [];
                 // Sort by newest first
                 allCandidates.sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
-                renderCandidates(allCandidates);
+                applyFilters();
             } else {
                 showError('Authentication Failed', data.error || 'Invalid API Key');
                 allCandidates = [];
-                renderCandidates([]);
+                applyFilters();
             }
         } catch (e) {
             showError('Network Error', e.message);
             allCandidates = [];
-            renderCandidates([]);
+            applyFilters();
         }
     }
 
@@ -111,6 +178,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
             }
 
+            const locationStr = (cand.location && cand.location.toLowerCase() !== 'true') ? cand.location : '-';
+
             const updatedDate = new Date(cand.updatedAt || cand.createdAt).toLocaleDateString();
 
             tr.innerHTML = `
@@ -126,7 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="user-headline" title="${escapeHtml(cand.jobTitle || '')}">${escapeHtml(cand.jobTitle || '-')}</div>
                 </td>
                 <td>
-                    <div class="user-location">${escapeHtml(cand.location || '-')}</div>
+                    <div class="user-location">${escapeHtml(locationStr)}</div>
                 </td>
                 <td>
                     ${latestExpHtml}
@@ -155,7 +224,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (deleteBtn) {
                 deleteBtn.addEventListener('click', async (e) => {
                     e.stopPropagation();
-                    if (confirm(`Are you sure you want to delete ${cand.fullName}?`)) {
+                    const titleSuffix = cand.jobTitle ? ` (${cand.jobTitle})` : '';
+                    if (await showConfirm(`Are you sure you want to delete ${cand.fullName}${titleSuffix}?`)) {
                         deleteBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
                         const apiKey = apiKeyInput.value.trim() || 'syncup-dev-key';
                         const candidateId = cand._id || cand.id;
@@ -230,6 +300,12 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchContactBtn.dataset.id = cand._id || cand.id;
         fetchContactBtn.dataset.name = cand.fullName;
         fetchContactBtn.dataset.company = cand.company;
+        
+        fetchMoreBtn.dataset.url = cand.linkedinUrl;
+        fetchMoreBtn.dataset.name = cand.fullName;
+        fetchMoreBtn.dataset.headline = cand.jobTitle;
+        fetchMoreBtn.dataset.thumbnail = cand.photoUrl;
+        fetchMoreBtn.dataset.location = cand.location;
     }
 
     function closeModal() {
@@ -240,24 +316,47 @@ document.addEventListener('DOMContentLoaded', () => {
     modalClose.addEventListener('click', closeModal);
     modalBackdrop.addEventListener('click', closeModal);
 
-    // Search Filtering
-    searchInput.addEventListener('input', (e) => {
-        const query = e.target.value.toLowerCase();
-        if (!query) {
-            renderCandidates(allCandidates);
-            return;
-        }
+    // Tab Switching Logic
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            tabBtns.forEach(b => b.classList.remove('active'));
+            tabContents.forEach(c => c.classList.add('hidden'));
+            
+            btn.classList.add('active');
+            const target = btn.dataset.target;
+            document.getElementById(target).classList.remove('hidden');
+        });
+    });
+
+    // Apply Filters
+    function applyFilters() {
+        const query = searchInput.value.toLowerCase();
+        const titleVal = filterTitle.value.toLowerCase();
+        const compVal = filterCompany.value.toLowerCase();
+        const locVal = filterLocation.value.toLowerCase();
 
         const filtered = allCandidates.filter(c => {
-            const nameMatch = (c.fullName || '').toLowerCase().includes(query);
-            const titleMatch = (c.jobTitle || '').toLowerCase().includes(query);
-            const compMatch = (c.company || '').toLowerCase().includes(query);
-            const locMatch = (c.location || '').toLowerCase().includes(query);
-            return nameMatch || titleMatch || compMatch || locMatch;
+            const matchesQuery = !query || 
+                ((c.fullName || '').toLowerCase().includes(query) || 
+                 (c.jobTitle || '').toLowerCase().includes(query) || 
+                 (c.company || '').toLowerCase().includes(query) || 
+                 (c.location || '').toLowerCase().includes(query));
+
+            const matchesTitle = !titleVal || (c.jobTitle || '').toLowerCase().includes(titleVal);
+            const matchesComp = !compVal || (c.company || '').toLowerCase().includes(compVal);
+            const matchesLoc = !locVal || (c.location || '').toLowerCase().includes(locVal);
+
+            return matchesQuery && matchesTitle && matchesComp && matchesLoc;
         });
 
         renderCandidates(filtered);
-    });
+    }
+
+    // Attach listeners
+    searchInput.addEventListener('input', applyFilters);
+    filterTitle.addEventListener('input', applyFilters);
+    filterCompany.addEventListener('input', applyFilters);
+    filterLocation.addEventListener('input', applyFilters);
 
     // Refresh Action
     refreshBtn.addEventListener('click', () => {
@@ -301,7 +400,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     modalPhone.innerText = data.contact.phone || 'No phone found';
                     fetchCandidates(); // Re-fetch all to update main list state
                 } else {
-                    alert("Apollo API could not find any contact info for this candidate.");
+                    alert("Hunter.io API could not find any contact info for this candidate.");
                     fetchContactBtn.innerHTML = '<i class="fa-solid fa-address-book"></i> Fetch Contact Info';
                 }
             } else {
@@ -315,8 +414,50 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchContactBtn.disabled = false;
     });
 
+    fetchMoreBtn.addEventListener('click', async () => {
+        const url = fetchMoreBtn.dataset.url;
+        const name = fetchMoreBtn.dataset.name;
+        const headline = fetchMoreBtn.dataset.headline;
+        const thumbnail = fetchMoreBtn.dataset.thumbnail;
+        const apiKey = apiKeyInput.value.trim() || 'syncup-dev-key';
+
+        if (!url) {
+            alert("No LinkedIn URL found for this candidate.");
+            return;
+        }
+
+        fetchMoreBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Fetching...';
+        fetchMoreBtn.disabled = true;
+
+        try {
+            const res = await fetch('/api/enrich-url', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+                body: JSON.stringify({ 
+                    linkedinUrl: url,
+                    fallbackData: { name, headline, thumbnail }
+                })
+            });
+            const data = await res.json();
+            
+            if (res.ok && data.success) {
+                alert("Successfully fetched from PDL!");
+                fetchCandidates(); // Re-fetch all to update main list state
+                closeModal();
+            } else {
+                alert('PDL Error: ' + (data.error || 'Unknown error'));
+            }
+        } catch (e) {
+            alert('Network Error: ' + e.message);
+        }
+        
+        fetchMoreBtn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> Fetch More (PDL)';
+        fetchMoreBtn.disabled = false;
+    });
+
     // Manual Sourcing Logic
-    let currentFoundUrl = '';
+    const sourceResultContainer = document.getElementById('source-results-container');
+    const sourceResultsList = document.getElementById('source-results-list');
 
     sourceFindBtn.addEventListener('click', async () => {
         const name = sourceName.value.trim();
@@ -330,7 +471,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         sourceFindBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Searching...';
         sourceFindBtn.disabled = true;
-        sourceResult.classList.add('hidden');
+        sourceResultContainer.classList.add('hidden');
+        sourceResultsList.innerHTML = '';
 
         try {
             const res = await fetch('/api/find', {
@@ -340,17 +482,73 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const data = await res.json();
 
-            if (res.ok && data.success) {
-                currentFoundUrl = data.linkedinUrl;
-                sourceLink.href = currentFoundUrl;
-                sourceOpenBtn.href = currentFoundUrl;
-                sourceResult.classList.remove('hidden');
-                
-                // Reset enrich button state
-                sourceEnrichBtn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> Auto-Save via RapidAPI';
-                sourceEnrichBtn.disabled = false;
+            if (res.ok && data.success && data.results && data.results.length > 0) {
+                data.results.forEach((match, idx) => {
+                    const card = document.createElement('div');
+                    card.style.cssText = 'border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; background: var(--bg-secondary);';
+                    
+                    card.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;">
+                            <div style="display: flex; gap: 12px; flex: 1;">
+                                ${match.thumbnail ? `<img src="${escapeHtml(match.thumbnail)}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" onerror="this.style.display='none'">` : `<div style="width: 40px; height: 40px; border-radius: 50%; background: var(--bg-color); display: flex; align-items: center; justify-content: center; color: var(--text-muted); flex-shrink: 0;"><i class="fa-solid fa-user"></i></div>`}
+                                <div>
+                                    <a href="${match.linkedinUrl}" target="_blank" style="color: var(--primary-color); font-weight: 600; font-size: 0.95rem; text-decoration: none; display: block; margin-bottom: 4px;">${escapeHtml(match.title)}</a>
+                                    <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${escapeHtml(match.snippet)}</p>
+                                </div>
+                            </div>
+                            <button id="enrich-btn-${idx}" class="btn" style="padding: 6px 12px; font-size: 0.8rem; white-space: nowrap; width: auto;">
+                                <i class="fa-solid fa-cloud-arrow-down"></i> Save Profile
+                            </button>
+                        </div>
+                    `;
+                    sourceResultsList.appendChild(card);
+
+                    // Add click listener for this specific result
+                    document.getElementById(`enrich-btn-${idx}`).addEventListener('click', async (e) => {
+                        const btn = e.currentTarget;
+                        btn.disabled = true;
+                        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+
+                        try {
+                            const enrichRes = await fetch('/api/enrich-url', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+                                body: JSON.stringify({ 
+                                    linkedinUrl: match.linkedinUrl,
+                                    fallbackData: {
+                                        name: match.title,
+                                        headline: match.snippet,
+                                        thumbnail: match.thumbnail
+                                    }
+                                })
+                            });
+                            const enrichData = await enrichRes.json();
+
+                            if (enrichRes.ok && enrichData.success) {
+                                btn.innerHTML = '<i class="fa-solid fa-check"></i> Saved!';
+                                btn.style.backgroundColor = 'var(--success-color)';
+                                if (enrichData.fallback) {
+                                    showToast('PDL could not find the profile. Saved a basic skeleton profile instead.', 'warning');
+                                } else {
+                                    showToast('Profile enriched and saved successfully!', 'success');
+                                }
+                                fetchCandidates(); // Refresh the dashboard
+                            } else {
+                                alert('PDL Error: ' + (enrichData.error || 'Failed to enrich.'));
+                                btn.disabled = false;
+                                btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> Save Profile';
+                            }
+                        } catch (err) {
+                            alert('Network Error: ' + err.message);
+                            btn.disabled = false;
+                            btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> Save Profile';
+                        }
+                    });
+                });
+
+                sourceResultContainer.classList.remove('hidden');
             } else {
-                alert('Search Error: ' + (data.error || 'Profile not found.'));
+                alert('Search Error: ' + (data.error || 'No profiles found.'));
             }
         } catch (e) {
             alert('Network Error: ' + e.message);
@@ -358,37 +556,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         sourceFindBtn.innerHTML = 'Find LinkedIn';
         sourceFindBtn.disabled = false;
-    });
-
-    sourceEnrichBtn.addEventListener('click', async () => {
-        if (!currentFoundUrl) return;
-        
-        const apiKey = apiKeyInput.value.trim() || 'syncup-dev-key';
-        
-        sourceEnrichBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
-        sourceEnrichBtn.disabled = true;
-
-        try {
-            const res = await fetch('/api/enrich-url', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
-                body: JSON.stringify({ linkedinUrl: currentFoundUrl })
-            });
-            const data = await res.json();
-
-            if (res.ok && data.success) {
-                sourceEnrichBtn.innerHTML = '<i class="fa-solid fa-check"></i> Saved!';
-                fetchCandidates(); // Refresh the dashboard list
-            } else {
-                alert('RapidAPI Error: ' + (data.error || 'Failed to enrich.'));
-                sourceEnrichBtn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> Auto-Save via RapidAPI';
-                sourceEnrichBtn.disabled = false;
-            }
-        } catch (e) {
-            alert('Network Error: ' + e.message);
-            sourceEnrichBtn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> Auto-Save via RapidAPI';
-            sourceEnrichBtn.disabled = false;
-        }
     });
 
     // Utility to prevent XSS in rendering

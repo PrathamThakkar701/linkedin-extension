@@ -5,3 +5,5 @@ database.json
 .env.local
 .vercel
 *.pptx
+reports/
+test

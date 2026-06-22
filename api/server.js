@@ -41,6 +41,14 @@ app.get('/health', (req, res) => {
 // Apply Authentication to API routes
 app.use('/api', requireApiKey);
 
+// Get Global Config
+app.get('/api/config', (req, res) => {
+    res.json({
+        success: true,
+        MAX_BULK_PROFILES: process.env.MAX_BULK_PROFILES ? parseInt(process.env.MAX_BULK_PROFILES) : null
+    });
+});
+
 // Mount modular routes
 app.use('/api', enrichmentRoutes);
 app.use('/api/candidates', candidatesRoutes);
