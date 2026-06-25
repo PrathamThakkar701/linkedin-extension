@@ -29,6 +29,7 @@ const candidateSchema = new mongoose.Schema({
     phone: { type: String, default: '' },
     linkedinUrl: { type: String, unique: true, required: true },
     photoUrl: { type: String, default: '' },
+    about: { type: String, default: '' },
     skills: { type: [String], default: [] },
     experience: { type: Array, default: [] },
     education: { type: Array, default: [] },

@@ -73,21 +73,8 @@ function extractFromDOM() {
   if (nameIndex !== -1) {
     let nextIndex = nameIndex + 1;
     
-    /* 
-    // OLD LOGIC (Commented out as requested):
-    // Skip pronouns if they exist
-    const pronouns = ['he/him', 'she/her', 'they/them'];
-    if (lines[nextIndex] && pronouns.some(p => lines[nextIndex].toLowerCase().includes(p))) {
-      nextIndex++;
-    }
 
-    // The line immediately after the name (and pronouns) is the headline
-    if (lines[nextIndex]) {
-      result.headline = lines[nextIndex];
-    }
-    */
-
-    // NEW LOGIC: Skip pronouns AND connection degrees
+    // Skip pronouns AND connection degrees
     while (lines[nextIndex]) {
         const textLower = lines[nextIndex].toLowerCase().trim();
         
@@ -158,9 +145,30 @@ function extractFromDOM() {
   const photoEl = profileSection.querySelector('img.pv-top-card-profile-picture__image, img[src*="profile-displayphoto"], img[src*="profile-framedphoto"]');
   if (photoEl) result.photoUrl = photoEl.src;
 
+  // About Section Extraction
+  result.about = '';
+  const h2s = document.querySelectorAll('h2');
+  let aboutHeader = null;
+  for (const h2 of h2s) {
+      if (h2.textContent && h2.textContent.trim().toLowerCase() === 'about') {
+          aboutHeader = h2;
+          break;
+      }
+  }
+  if (aboutHeader) {
+      const aboutContainer = aboutHeader.closest('section') || aboutHeader.closest('.artdeco-card') || aboutHeader.parentElement.parentElement.parentElement;
+      if (aboutContainer) {
+          const textBox = aboutContainer.querySelector('[data-testid="expandable-text-box"]') || aboutContainer.querySelector('.inline-show-more-text') || aboutContainer.querySelector('div.display-flex.ph5.pv3');
+          if (textBox) {
+              result.about = textBox.textContent.replace('… more', '').replace('... more', '').replace(/show more/gi, '').trim();
+          } else {
+              result.about = aboutContainer.innerText.replace('About', '').trim();
+          }
+      }
+  }
+
   // 7. Experience Extraction
   const experienceArray = [];
-  const h2s = document.querySelectorAll('h2');
   let expHeader = null;
   for (const h2 of h2s) {
       if (h2.innerText && h2.innerText.trim().toLowerCase() === 'experience') {
@@ -649,6 +657,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         currentCompany:  fromJSON?.currentCompany  || fromDOM?.currentCompany  || 'Unknown Company',
         photoUrl:        fromJSON?.photoUrl        || fromDOM?.photoUrl        || '',
         linkedinUrl:     url,
+        about:           fromJSON?.about           || fromDOM?.about           || '',
         email:           contactInfo.email || '',
         phone:           contactInfo.phone || '',
         experience:      fromDOM?.experience || [],

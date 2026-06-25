@@ -243,6 +243,7 @@ function renderProfilePreview(data) {
   document.getElementById('preview-name').innerText = data.name || 'Unknown';
   document.getElementById('preview-headline').innerText = data.headline || 'No headline';
   document.getElementById('preview-meta').innerText = `${data.location} • ${data.currentCompany}`;
+  document.getElementById('preview-about').innerText = data.about || 'No summary available.';
   const saveBtn = document.getElementById('save-current-profile');
   saveBtn.disabled = false;
   saveBtn.innerText = 'Save to SyncUp';

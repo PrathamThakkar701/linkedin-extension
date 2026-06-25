@@ -57,5 +57,37 @@ router.delete('/:id', async (req, res) => {
         res.status(500).json({ success: false, error: err.message });
     }
 });
+// Export/Webhook endpoint to send data to external URL
+router.post('/export', async (req, res) => {
+    try {
+        const { webhookUrl, candidateId } = req.body;
+        if (!webhookUrl) {
+            return res.status(400).json({ success: false, error: 'webhookUrl is required' });
+        }
+
+        let dataToSend;
+        if (candidateId) {
+            dataToSend = await Candidate.findById(candidateId).lean();
+            if (!dataToSend) return res.status(404).json({ success: false, error: 'Candidate not found' });
+        } else {
+            dataToSend = await Candidate.find().sort({ createdAt: -1 }).lean();
+        }
+
+        const response = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dataToSend)
+        });
+
+        if (!response.ok) {
+            throw new Error(`External server returned ${response.status}`);
+        }
+
+        return res.status(200).json({ success: true, message: 'Data successfully exported' });
+    } catch (err) {
+        console.error('Export Error:', err);
+        return res.status(500).json({ success: false, error: err.message });
+    }
+});
 
 module.exports = router;

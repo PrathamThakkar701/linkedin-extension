@@ -88,6 +88,7 @@ function normalizeCandidate(raw, source = 'api') {
         phone:       phone,
         linkedinUrl: cleanLinkedinUrl(linkedinUrl),
         photoUrl:    raw.photoUrl    || raw.profile_pic_url  || '',
+        about:       raw.about       || raw.summary          || '',
         skills:      raw.skills      || (raw.skills_v2 ? raw.skills_v2.map(s => s.name) : []),
         experience:  expArray,
         education:   raw.education   || raw.education_v2     || [],
@@ -169,7 +170,8 @@ async function intelligentUpsert(normalized) {
                 location: existing.location || normalized.location,
                 email: existing.email || normalized.email,
                 phone: existing.phone || normalized.phone,
-                photoUrl: existing.photoUrl || normalized.photoUrl
+                photoUrl: existing.photoUrl || normalized.photoUrl,
+                about: existing.about || normalized.about
             };
         } else {
             // If it's an extension scrape, update our records but keep existing contact info if missing
@@ -178,6 +180,7 @@ async function intelligentUpsert(normalized) {
                 ...normalized,
                 email: normalized.email || existing.email,
                 phone: normalized.phone || existing.phone,
+                about: normalized.about || existing.about,
                 experience: normalized.experience.length > 0 ? normalized.experience : existing.experience,
                 education: normalized.education.length > 0 ? normalized.education : existing.education,
                 skills: normalized.skills.length > 0 ? normalized.skills : existing.skills

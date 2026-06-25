@@ -74,6 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalName = document.getElementById('modal-name');
     const modalHeadline = document.getElementById('modal-headline');
     const modalLocation = document.getElementById('modal-location').querySelector('span');
+    const modalAbout = document.getElementById('modal-about');
     const modalExperience = document.getElementById('modal-experience');
     const modalRaw = document.getElementById('modal-raw');
     const fetchContactBtn = document.getElementById('fetch-contact-btn');
@@ -212,7 +213,6 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Row click listener
             tr.addEventListener('click', (e) => {
-                // If they clicked the anchor tag or the delete button, let them handle it
                 if (e.target.closest('a.profile-link') || e.target.closest('.delete-btn')) {
                     return;
                 }
@@ -259,6 +259,7 @@ document.addEventListener('DOMContentLoaded', () => {
         modalName.innerText = cand.fullName || 'Unknown';
         modalHeadline.innerText = cand.jobTitle || 'No headline';
         modalLocation.innerText = cand.location || 'Unknown Location';
+        modalAbout.innerText = cand.about || '';
         
         // Render Experience
         modalExperience.innerHTML = '';
