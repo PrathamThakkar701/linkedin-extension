@@ -548,7 +548,6 @@ body {
 .tabs-container {
     display: flex;
     gap: 2rem;
-    padding: 0 3rem;
     border-bottom: 1px solid var(--border-color);
     margin-bottom: 20px;
     background: var(--bg-main);
@@ -571,7 +570,7 @@ body {
 }
 
 .tab-btn.active {
-    color: var(--text-main);
+    color: var(--primary);
     border-bottom-color: var(--primary);
 }
 
@@ -579,12 +578,32 @@ body {
 .filters-bar {
     display: flex;
     gap: 15px;
-    padding: 0 3rem;
     margin-bottom: 20px;
     align-items: center;
+    width: 100%;
+}
+
+.filters-bar .search-bar {
+    flex: 2;
+    display: flex;
+    align-items: center;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+}
+
+.filters-bar .search-bar input {
+    flex: 1;
+    width: 100%;
+}
+
+.filters-bar .filter-group {
+    flex: 1;
 }
 
 .filter-group input {
+    width: 100%;
     padding: 0.5rem;
     border: 1px solid var(--border-color);
     border-radius: 6px;
@@ -592,5 +611,4 @@ body {
     color: var(--text-main);
     font-family: 'Inter', sans-serif;
     font-size: 0.875rem;
-    min-width: 150px;
 }

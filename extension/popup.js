@@ -151,7 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 chrome.storage.sync.get(['apiUrl', 'apiKey'], async (settings) => {
                     const apiUrl = settings.apiUrl || 'http://localhost:3000';
-                    const apiKey = settings.apiKey || 'syncup-dev-key';
+                    const apiKey = settings.apiKey;
                     
                     let limit = Infinity;
                     try {
@@ -253,7 +253,7 @@ function renderProfilePreview(data) {
   if (data.linkedinUrl) {
       chrome.storage.sync.get(['apiUrl', 'apiKey'], async (settings) => {
           const apiUrl = settings.apiUrl || 'http://localhost:3000';
-          const apiKey = settings.apiKey || 'syncup-dev-key';
+          const apiKey = settings.apiKey;
           try {
               const res = await fetch(`${apiUrl}/api/candidates/check?url=${encodeURIComponent(data.linkedinUrl)}`, {
                   headers: { 'x-api-key': apiKey }
@@ -321,7 +321,7 @@ async function saveToApi(data, msgElement, btnElement = null) {
   
   chrome.storage.sync.get(['apiUrl', 'apiKey'], async (settings) => {
     const apiUrl = settings.apiUrl || 'http://localhost:3000';
-    const apiKey = settings.apiKey || 'syncup-dev-key';
+    const apiKey = settings.apiKey;
     
     try {
       const res = await fetch(`${apiUrl}/api/enrich`, {

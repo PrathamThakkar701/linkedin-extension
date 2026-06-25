@@ -20,7 +20,7 @@ const saveOptions = () => {
 // stored in chrome.storage.
 const restoreOptions = () => {
   chrome.storage.sync.get(
-    { apiUrl: 'http://localhost:3000', apiKey: 'syncup-dev-key' },
+    { apiUrl: 'http://localhost:3000', apiKey: '' },
     (items) => {
       document.getElementById('apiUrl').value = items.apiUrl;
       document.getElementById('apiKey').value = items.apiKey;
