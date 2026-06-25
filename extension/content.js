@@ -86,8 +86,11 @@ function extractFromDOM() {
         
         // Is it an audio pronunciation icon label? (Sometimes screen readers read out a hidden label)
         const isAudioLabel = textLower.includes('listen to');
+
+        // Is it a "Verify in X minutes" or "Verify now" badge?
+        const isVerifyBadge = textLower.includes('verify in') || textLower.includes('verify now') || textLower.includes('get verified');
         
-        if (isPronoun || isDegree || isAudioLabel) {
+        if (isPronoun || isDegree || isAudioLabel || isVerifyBadge) {
             nextIndex++; // Skip this line, move to the next
         } else {
             // We found the actual headline!
@@ -200,12 +203,41 @@ function extractFromDOM() {
           items.forEach(item => {
               const expLines = item.innerText.split('\n').map(l => l.trim()).filter(l => l.length > 0 && l !== '·' && !l.includes('...'));
               if (expLines.length >= 2) {
-                 experienceArray.push({
-                     title: expLines[0],
-                     company: expLines[1],
-                     duration: expLines[2] || '',
-                     details: expLines.slice(3, 6).join(' | ') 
-                 });
+                 const durationRegex = /\b(yr|yrs|mo|mos|year|years|month|months)\b/i;
+                 const isGrouped = expLines[1] && durationRegex.test(expLines[1]) && /\d/.test(expLines[1]);
+                 
+                 if (isGrouped) {
+                     // Grouped Experience (Multiple roles at one company)
+                     const company = expLines[0];
+                     const title = expLines[2] || 'Multiple Roles';
+                     
+                     // Find the date for the latest role
+                     let dateIdx = expLines.findIndex((l, i) => i > 2 && (l.includes('-') || l.includes('Present')) && /\d{4}/.test(l));
+                     let duration = expLines[1];
+                     let detailsArr = [];
+                     
+                     if (dateIdx !== -1) {
+                         duration = expLines[dateIdx];
+                         detailsArr = expLines.slice(3, dateIdx + 2).filter(l => l !== duration);
+                     } else {
+                         detailsArr = expLines.slice(3, 6);
+                     }
+                     
+                     experienceArray.push({
+                         title: title,
+                         company: company,
+                         duration: duration,
+                         details: detailsArr.join(' | ')
+                     });
+                 } else {
+                     // Normal Experience
+                     experienceArray.push({
+                         title: expLines[0],
+                         company: expLines[1],
+                         duration: expLines[2] || '',
+                         details: expLines.slice(3, 6).join(' | ') 
+                     });
+                 }
               }
           });
       }
@@ -538,14 +570,7 @@ async function extractContactInfo() {
               return resolve({ email: '', phone: '' });
           }
 
-          // Check if this is a 1st-degree connection. If not, clicking contact info often opens a Premium upsell.
-          const topCardText = (document.querySelector('.pv-top-card') || document.body).innerText;
-          if (!topCardText.includes('1st') && !topCardText.includes('Contact info')) {
-              console.warn("[SyncUp] Not a 1st degree connection. Skipping contact info to avoid Premium upsell.");
-              return resolve({ email: '', phone: '' });
-          }
-
-          console.warn("[SyncUp] Found contact link and verified 1st-degree. Dispatching trusted-like click...");
+          console.warn("[SyncUp] Found contact link. Dispatching trusted-like click...");
           
           // React often ignores .click() on <a> tags if isTrusted is false, causing a hard page reload!
           // We dispatch a custom MouseEvent to trick React into handling it as a soft modal open.
@@ -574,27 +599,25 @@ async function extractContactInfo() {
                   email = (emailEl.textContent || emailEl.innerText || '').trim();
               }
               
-              // 2. Try finding phone via tel link
+              // 2. Try finding phone via tel link or ci-phone section
               const phoneEl = document.querySelector('a[href^="tel:"]');
               if (phoneEl) {
                   phone = (phoneEl.textContent || phoneEl.innerText || '').trim();
-              }
-              
-              // Fallback Regex on the entire body text (since modal classes are obfuscated)
-              const bodyText = document.body.innerText || '';
-              
-              if (!email) {
-                  // Find all emails on the page. The modal text is usually appended at the end of the DOM.
-                  const emailMatches = bodyText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g);
-                  if (emailMatches && emailMatches.length > 0) {
-                      email = emailMatches[emailMatches.length - 1]; // Grab the last one found
+              } else {
+                  const ciPhone = document.querySelector('.ci-phone span[dir="ltr"], .ci-phone ul li span');
+                  if (ciPhone) {
+                      phone = (ciPhone.textContent || ciPhone.innerText || '').trim();
                   }
               }
-
-              if (!phone) {
-                  // Basic regex for phone numbers in LinkedIn's HTML structure
-                  const phoneMatch = bodyText.match(/(?:phone|Phone|Mobile)[\s\S]{0,100}?(\+?\d{1,3}[\s.-]?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})/);
-                  if (phoneMatch) phone = phoneMatch[1].trim();
+              
+              const modalBody = document.querySelector('.pv-contact-info');
+              if (modalBody) {
+                  const bodyText = modalBody.innerText || '';
+                  if (!phone) {
+                      // Basic regex for phone numbers in LinkedIn's HTML structure
+                      const phoneMatch = bodyText.match(/(?:phone|Phone|Mobile)[\s\S]{0,100}?(\+?\d{1,3}[\s.-]?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})/);
+                      if (phoneMatch) phone = phoneMatch[1].trim();
+                  }
               }
               
               if (email || phone) break;

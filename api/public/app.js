@@ -169,7 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const profileLink = cand.linkedinUrl || '#';
 
             // Latest Experience
-            let latestExpHtml = '<span class="text-muted">-</span>';
+            let latestExpHtml = '<div style="text-align: center;" class="text-muted">-</div>';
             if (cand.experience && cand.experience.length > 0) {
                 const latest = cand.experience[0];
                 latestExpHtml = `
@@ -194,10 +194,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </td>
                 <td>
-                    <div class="user-headline" title="${escapeHtml(cand.jobTitle || '')}">${escapeHtml(cand.jobTitle || '-')}</div>
+                    <div class="user-headline" style="${!cand.jobTitle || cand.jobTitle === '-' ? 'text-align: center;' : ''}" title="${escapeHtml(cand.jobTitle || '')}">${escapeHtml(cand.jobTitle || '-')}</div>
                 </td>
                 <td>
-                    <div class="user-location">${escapeHtml(locationStr)}</div>
+                    <div class="user-location" style="${locationStr === '-' ? 'text-align: center;' : ''}">${escapeHtml(locationStr)}</div>
                 </td>
                 <td>
                     ${latestExpHtml}
@@ -344,7 +344,9 @@ document.addEventListener('DOMContentLoaded', () => {
                  (c.company || '').toLowerCase().includes(query) || 
                  (c.location || '').toLowerCase().includes(query));
 
-            const matchesTitle = !titleVal || (c.jobTitle || '').toLowerCase().includes(titleVal);
+            const matchesTitle = !titleVal || 
+                (c.jobTitle || '').toLowerCase().includes(titleVal) || 
+                (c.headline || '').toLowerCase().includes(titleVal);
             const matchesComp = !compVal || (c.company || '').toLowerCase().includes(compVal);
             const matchesLoc = !locVal || (c.location || '').toLowerCase().includes(locVal);
 

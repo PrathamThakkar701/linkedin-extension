@@ -67,13 +67,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // List Search Construction
   document.getElementById('run-search').addEventListener('click', () => {
     const role = document.getElementById('search-role').value.trim();
-    if (!role) {
-      alert("Role is required.");
-      return;
-    }
     
     // Build a clean keyword string combining role, location, company
-    const keywordParts = [role];
+    const keywordParts = [];
+    if (role) keywordParts.push(role);
     
     const location = document.getElementById('search-location').value.trim();
     if (location) keywordParts.push(location);
