@@ -11,7 +11,7 @@
   ],
   "host_permissions": [
     "https://*.linkedin.com/*",
-    "http://localhost:3000/*"
+    "https://linkedin-extension-ten.vercel.app/*"
   ],
   "action": {
     "default_popup": "popup.html"

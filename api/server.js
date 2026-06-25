@@ -12,8 +12,11 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.API_KEY || 'syncup-dev-key';
 
-// Connect to MongoDB
-connectDB();
+// Middleware to ensure DB connection on every request for Serverless
+app.use(async (req, res, next) => {
+    await connectDB();
+    next();
+});
 
 app.use(cors());
 app.use(bodyParser.json());

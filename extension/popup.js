@@ -150,8 +150,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 btn.innerText = 'Saving...';
                 
                 chrome.storage.sync.get(['apiUrl', 'apiKey'], async (settings) => {
-                    const apiUrl = settings.apiUrl || 'http://localhost:3000';
-                    const apiKey = settings.apiKey;
+                    const apiUrl = settings.apiUrl || 'https://linkedin-extension-ten.vercel.app';
+                    const apiKey = settings.apiKey || 'syncup-dev-key';
                     
                     let limit = Infinity;
                     try {
@@ -252,8 +252,8 @@ function renderProfilePreview(data) {
   // Check if candidate exists in DB
   if (data.linkedinUrl) {
       chrome.storage.sync.get(['apiUrl', 'apiKey'], async (settings) => {
-          const apiUrl = settings.apiUrl || 'http://localhost:3000';
-          const apiKey = settings.apiKey;
+          const apiUrl = settings.apiUrl || 'https://linkedin-extension-ten.vercel.app';
+          const apiKey = settings.apiKey || 'syncup-dev-key';
           try {
               const res = await fetch(`${apiUrl}/api/candidates/check?url=${encodeURIComponent(data.linkedinUrl)}`, {
                   headers: { 'x-api-key': apiKey }
@@ -320,8 +320,8 @@ async function saveToApi(data, msgElement, btnElement = null) {
   msgElement.innerHTML = '<span style="color:var(--text-muted)">Saving...</span>';
   
   chrome.storage.sync.get(['apiUrl', 'apiKey'], async (settings) => {
-    const apiUrl = settings.apiUrl || 'http://localhost:3000';
-    const apiKey = settings.apiKey;
+    const apiUrl = settings.apiUrl || 'https://linkedin-extension-ten.vercel.app';
+    const apiKey = settings.apiKey || 'syncup-dev-key';
     
     try {
       const res = await fetch(`${apiUrl}/api/enrich`, {

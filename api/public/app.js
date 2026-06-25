@@ -134,7 +134,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 allCandidates.sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
                 applyFilters();
             } else {
-                showError('Authentication Failed', data.error || 'Invalid API Key');
+                const errTitle = res.status === 401 ? 'Authentication Failed' : 'Server Error';
+                showError(errTitle, data.error || 'Unknown error occurred');
                 allCandidates = [];
                 applyFilters();
             }
