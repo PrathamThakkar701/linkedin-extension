@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Fetch Candidates from API
     async function fetchCandidates() {
-        const apiKey = apiKeyInput.value.trim();
+        const apiKey = apiKeyInput.value.trim() || 'syncup-dev-key';
         listBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin fa-2x"></i></td></tr>';
         errorContainer.classList.add('hidden');
 
@@ -228,7 +228,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const titleSuffix = cand.jobTitle ? ` (${cand.jobTitle})` : '';
                     if (await showConfirm(`Are you sure you want to delete ${cand.fullName}${titleSuffix}?`)) {
                         deleteBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-                        const apiKey = apiKeyInput.value.trim();
+                        const apiKey = apiKeyInput.value.trim() || 'syncup-dev-key';
                         const candidateId = cand._id || cand.id;
                         try {
                             const res = await fetch(`/api/candidates/${candidateId}`, {
@@ -373,7 +373,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const id = fetchContactBtn.dataset.id;
         const name = fetchContactBtn.dataset.name;
         const company = fetchContactBtn.dataset.company;
-        const apiKey = apiKeyInput.value.trim();
+        const apiKey = apiKeyInput.value.trim() || 'syncup-dev-key';
 
         if (!name || !company) {
             alert("Candidate is missing a Name or Company. Cannot search Apollo API.");
@@ -421,7 +421,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const name = fetchMoreBtn.dataset.name;
         const headline = fetchMoreBtn.dataset.headline;
         const thumbnail = fetchMoreBtn.dataset.thumbnail;
-        const apiKey = apiKeyInput.value.trim();
+        const apiKey = apiKeyInput.value.trim() || 'syncup-dev-key';
 
         if (!url) {
             alert("No LinkedIn URL found for this candidate.");
@@ -464,7 +464,7 @@ document.addEventListener('DOMContentLoaded', () => {
     sourceFindBtn.addEventListener('click', async () => {
         const name = sourceName.value.trim();
         const company = sourceCompany.value.trim();
-        const apiKey = apiKeyInput.value.trim();
+        const apiKey = apiKeyInput.value.trim() || 'syncup-dev-key';
 
         if (!name) {
             alert('Candidate Name is required for manual search.');
