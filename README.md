@@ -1,6 +1,6 @@
 # SyncUp LinkedIn Enrichment Extension
 
-### 🚀 Quick Start: How to Install the Extension
+### Quick Start: How to Install the Extension
 
 1. Download the `SyncUp Extension.zip` file provided by your admin, or clone this repository.
 2. Unzip/extract the folder somewhere on your computer (like your Documents folder).
@@ -8,7 +8,7 @@
 4. Turn on **Developer mode** (the toggle switch in the top right corner).
 5. Click the **Load unpacked** button in the top left.
 6. Select the unzipped `extension` folder.
-7. Click the **Extensions puzzle piece icon** 🧩 in the top right of Chrome and click the **Pin** 📌 next to SyncUp!
+7. Click the **Extensions puzzle piece icon**  in the top right of Chrome and click the **Pin**  next to SyncUp!
 
 A two-part tool that finds LinkedIn profiles from multiple input types and saves them to SyncUp with zero manual data entry.
 
